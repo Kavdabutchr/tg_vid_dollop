@@ -1,30 +1,34 @@
 import requests
 import time
 import json
+import os
 
 # ================= CONFIG =================
-BOT_TOKEN = "8413995238:AAGxhkPb-DctxpO9vKBAdITvXWYMF3ZgUHo"
-GROUP_USERNAME = "@YourGroup"      # Replace with your group username
-CHANNEL_USERNAME = "@whitey_opposite_of_darky"  # Replace with your channel username
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Set this in Railway Variables
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # Set this in Railway Variables
+
+if not BOT_TOKEN or not CHANNEL_USERNAME:
+    print("❌ ERROR: BOT_TOKEN or CHANNEL_USERNAME not set in Railway Variables.")
+    exit()
 
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 
 # ================ DATABASE ================
-# Replace the values with your real Telegram file_ids
+# Replace placeholders with your real Telegram file_ids later
 SERIES_DB = {
     "rick_and_morty": {
-        "title": "rick_and_morty",
+        "title": "Rick and Morty",
         "episodes": {
-            "1": "FILE_ID_FOR_EP1",
-            "2": "FILE_ID_FOR_EP2",
-            "3": "FILE_ID_FOR_EP3",
+            "1": "PLACEHOLDER_EP1",
+            "2": "PLACEHOLDER_EP2",
+            "3": "PLACEHOLDER_EP3",
         }
     },
     "american_dad": {
-        "title": "american_dad",
+        "title": "American Dad",
         "episodes": {
-            "1": "FILE_ID_FOR_EP1",
-            "2": "FILE_ID_FOR_EP2",
+            "1": "PLACEHOLDER_EP1",
+            "2": "PLACEHOLDER_EP2",
         }
     }
 }
@@ -50,18 +54,13 @@ def send_video(chat_id, file_id, caption=None):
 
 def is_user_joined(user_id):
     try:
-        group_status = requests.get(BASE_URL + "getChatMember", params={
-            "chat_id": GROUP_USERNAME,
-            "user_id": user_id
-        }).json()
         channel_status = requests.get(BASE_URL + "getChatMember", params={
             "chat_id": CHANNEL_USERNAME,
             "user_id": user_id
         }).json()
 
         valid = ["member", "administrator", "creator"]
-        return (group_status["result"]["status"] in valid and
-                channel_status["result"]["status"] in valid)
+        return channel_status["result"]["status"] in valid
     except:
         return False
 
@@ -81,8 +80,10 @@ def generate_episode_buttons(series_code):
 # ================ MAIN LOOP =================
 last_update_id = None
 print("🤖 Bot is running...")
+
 while True:
     updates = get_updates(last_update_id)
+
     for item in updates["result"]:
         last_update_id = item["update_id"] + 1
         message = item.get("message")
@@ -98,18 +99,17 @@ while True:
             if text == "/start":
                 if not is_user_joined(user_id):
                     buttons = [
-                        [{"text": "✅ Join Group", "url": f"https://t.me/{GROUP_USERNAME[1:]}"}],
-                        [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}],
+                        [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]
                     ]
-                    send_message(chat_id, "🚫 You must join our group and channel first!", buttons)
+                    send_message(chat_id, "🚫 You must join our channel first!", buttons)
                 else:
                     buttons = generate_series_buttons()
                     send_message(chat_id, "✅ Welcome! Select a series below:", buttons)
 
-            # LIST SERIES
+            # LIST SERIES COMMAND
             elif text == "/series":
                 if not is_user_joined(user_id):
-                    send_message(chat_id, "🚫 Join our group and channel first!")
+                    send_message(chat_id, "🚫 Join our channel first!")
                 else:
                     buttons = generate_series_buttons()
                     send_message(chat_id, "🎬 Available Series:", buttons)
@@ -120,13 +120,12 @@ while True:
             user_id = callback["from"]["id"]
             data = callback["data"]
 
-            # Check join
+            # Check join again
             if not is_user_joined(user_id):
                 buttons = [
-                    [{"text": "✅ Join Group", "url": f"https://t.me/{GROUP_USERNAME[1:]}"}],
-                    [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}],
+                    [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]
                 ]
-                send_message(chat_id, "🚫 You must join our group and channel first!", buttons)
+                send_message(chat_id, "🚫 You must join our channel first!", buttons)
                 continue
 
             # SERIES CLICKED
@@ -140,8 +139,14 @@ while True:
                 parts = data.split(":")
                 series_code = parts[1]
                 ep = parts[2]
+
                 file_id = SERIES_DB[series_code]["episodes"][ep]
-                caption = f"✅ {SERIES_DB[series_code]['title']} - Episode {ep}"
-                send_video(chat_id, file_id, caption)
+
+                # Placeholder check
+                if file_id.startswith("PLACEHOLDER"):
+                    send_message(chat_id, f"🚧 {SERIES_DB[series_code]['title']} - Episode {ep} is coming soon!")
+                else:
+                    caption = f"✅ {SERIES_DB[series_code]['title']} - Episode {ep}"
+                    send_video(chat_id, file_id, caption)
 
     time.sleep(1)
