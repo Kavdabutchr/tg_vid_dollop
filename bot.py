@@ -4,8 +4,12 @@ import json
 import os
 
 # ================= CONFIG =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Set this in Railway Variables
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # Set this in Railway Variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Railway Variable
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # Railway Variable
+
+# DEBUG: Check if Railway sees your variables
+print("BOT_TOKEN:", BOT_TOKEN)
+print("CHANNEL_USERNAME:", CHANNEL_USERNAME)
 
 if not BOT_TOKEN or not CHANNEL_USERNAME:
     print("❌ ERROR: BOT_TOKEN or CHANNEL_USERNAME not set in Railway Variables.")
@@ -14,7 +18,7 @@ if not BOT_TOKEN or not CHANNEL_USERNAME:
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 
 # ================ DATABASE ================
-# Replace placeholders with your real Telegram file_ids later
+# Replace placeholders with real Telegram file_ids later
 SERIES_DB = {
     "rick_and_morty": {
         "title": "Rick and Morty",
@@ -150,3 +154,4 @@ while True:
                     send_video(chat_id, file_id, caption)
 
     time.sleep(1)
+
