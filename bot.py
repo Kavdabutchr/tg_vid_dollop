@@ -4,27 +4,20 @@ import json
 import os
 
 # ================= CONFIG =================
-def get_config():
-    BOT_TOKEN = os.getenv("BOT_TOKEN")
-    CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
-    return BOT_TOKEN, CHANNEL_USERNAME
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # Must be @channelusername
+CHECK_INTERVAL = 1  # seconds between polling updates
 
-# Runtime config
-BOT_TOKEN, CHANNEL_USERNAME = get_config()
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN is not set! Add it in Render Environment Variables.")
 
-# Print only for debugging at runtime
 print("🤖 Bot starting...")
-print("BOT_TOKEN:", BOT_TOKEN)
-print("CHANNEL_USERNAME:", CHANNEL_USERNAME)
-
-if not BOT_TOKEN or not CHANNEL_USERNAME:
-    print("❌ ERROR: BOT_TOKEN or CHANNEL_USERNAME not set in Railway Variables at runtime!")
-    exit()
+print(f"BOT_TOKEN: {'Set' if BOT_TOKEN else 'Not Set'}")
+print(f"CHANNEL_USERNAME: {CHANNEL_USERNAME if CHANNEL_USERNAME else 'Not Set'}")
 
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 
 # ================ DATABASE ================
-# Replace placeholders with your real Telegram file_ids later
 SERIES_DB = {
     "rick_and_morty": {
         "title": "Rick and Morty",
@@ -63,13 +56,15 @@ def send_video(chat_id, file_id, caption=None):
     requests.post(BASE_URL + "sendVideo", data=data)
 
 def is_user_joined(user_id):
+    if not CHANNEL_USERNAME:
+        return True  # Skip check if no channel set (testing)
     try:
-        channel_status = requests.get(BASE_URL + "getChatMember", params={
+        status = requests.get(BASE_URL + "getChatMember", params={
             "chat_id": CHANNEL_USERNAME,
             "user_id": user_id
         }).json()
-        valid = ["member", "administrator", "creator"]
-        return channel_status["result"]["status"] in valid
+        valid_status = ["member", "administrator", "creator"]
+        return status["result"]["status"] in valid_status
     except:
         return False
 
@@ -92,8 +87,7 @@ print("🤖 Bot is running...")
 
 while True:
     updates = get_updates(last_update_id)
-
-    for item in updates["result"]:
+    for item in updates.get("result", []):
         last_update_id = item["update_id"] + 1
         message = item.get("message")
         callback = item.get("callback_query")
@@ -104,18 +98,16 @@ while True:
             text = message.get("text", "").lower()
             user_id = message["from"]["id"]
 
-            # START COMMAND
+            # /start command
             if text == "/start":
                 if not is_user_joined(user_id):
-                    buttons = [
-                        [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]
-                    ]
+                    buttons = [[{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]]
                     send_message(chat_id, "🚫 You must join our channel first!", buttons)
                 else:
                     buttons = generate_series_buttons()
                     send_message(chat_id, "✅ Welcome! Select a series below:", buttons)
 
-            # LIST SERIES COMMAND
+            # /series command
             elif text == "/series":
                 if not is_user_joined(user_id):
                     send_message(chat_id, "🚫 Join our channel first!")
@@ -129,33 +121,26 @@ while True:
             user_id = callback["from"]["id"]
             data = callback["data"]
 
-            # Check join again
             if not is_user_joined(user_id):
-                buttons = [
-                    [{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]
-                ]
+                buttons = [[{"text": "✅ Join Channel", "url": f"https://t.me/{CHANNEL_USERNAME[1:]}"}]]
                 send_message(chat_id, "🚫 You must join our channel first!", buttons)
                 continue
 
-            # SERIES CLICKED
+            # Series selected
             if data.startswith("series:"):
                 series_code = data.split(":")[1]
                 buttons = generate_episode_buttons(series_code)
                 send_message(chat_id, f"🎬 {SERIES_DB[series_code]['title']} Episodes:", buttons)
 
-            # EPISODE CLICKED
+            # Episode selected
             elif data.startswith("episode:"):
-                parts = data.split(":")
-                series_code = parts[1]
-                ep = parts[2]
-
+                _, series_code, ep = data.split(":")
                 file_id = SERIES_DB[series_code]["episodes"][ep]
 
-                # Placeholder check
                 if file_id.startswith("PLACEHOLDER"):
                     send_message(chat_id, f"🚧 {SERIES_DB[series_code]['title']} - Episode {ep} is coming soon!")
                 else:
                     caption = f"✅ {SERIES_DB[series_code]['title']} - Episode {ep}"
                     send_video(chat_id, file_id, caption)
 
-    time.sleep(1)
+    time.sleep(CHECK_INTERVAL)
