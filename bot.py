@@ -42,7 +42,7 @@ def generate_series_buttons():
     return buttons
 
 # ================ WEBHOOK =================
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+@app.route("/webhook", methods=["POST"])
 def webhook():
     print("🔥 Webhook triggered!")  # Debug log
 
